@@ -37,6 +37,23 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pretext-sidebar",
+          "title": "PreTeXt",
+          "icon": "logo.png"
+        }
+      ]
+    },
+    "views": {
+      "pretext-sidebar": [
+        {
+          "id": "pretextDocumentOutline",
+          "name": "Document Outline"
+        }
+      ]
+    },
     "grammars": [
       {
         "language": "pretext",
@@ -182,6 +199,17 @@
         "description": "Scroll the live preview to the element at the cursor position."
       },
       {
+        "command": "pretext-tools.outlineJumpToLine",
+        "title": "Jump to source line",
+        "category": "PreTeXt"
+      },
+      {
+        "command": "pretext-tools.refreshOutline",
+        "title": "Refresh Document Outline",
+        "category": "PreTeXt",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "pretext-tools.viewCodeChat",
         "title": "Preview file with CodeChat",
         "icon": "$(open-preview)",
@@ -280,7 +308,15 @@
         "pretext": true
       }
     },
-    "menus": {},
+    "menus": {
+      "view/title": [
+        {
+          "command": "pretext-tools.refreshOutline",
+          "when": "view == pretextDocumentOutline",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": [
       {
         "title": "PreTeXt",

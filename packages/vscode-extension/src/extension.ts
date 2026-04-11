@@ -187,10 +187,15 @@ export async function activate(context: ExtensionContext) {
 }
 
 // this method is called when your extension is deactivated
-export function deactivate() {
+// NB: the return type and final `return lspDeactivate()` matter.
+// VS Code only waits (up to 5s) for the LSP client to stop if this
+// function returns a thenable.  Without the return, `client.stop()`
+// can be interrupted mid-flight, leaving the spawned lsp-server.js
+// process orphaned -- the root cause of the multi-window LSP leak.
+export function deactivate(): Thenable<void> | undefined {
   disposeLivePreview();
-  lspDeactivate();
   if (pretextTerminal) {
     pretextTerminal.dispose();
   }
+  return lspDeactivate();
 }

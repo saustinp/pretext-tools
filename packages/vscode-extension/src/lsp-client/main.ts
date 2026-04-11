@@ -81,13 +81,16 @@ export function activate(context: ExtensionContext) {
     clientOptions,
   );
 
-  //context.subscriptions.push(
-  //    vscode.commands.registerCommand("myExtension.sayHello", () => {
-  //        vscode.window.showWarningMessage("Hello!");
-  //    })
-  //);
+  // Register the client as a Disposable so it's stopped when the
+  // extension deactivates.  In vscode-languageclient 9.x, LanguageClient
+  // implements Disposable, and disposing it internally calls stop() with
+  // a timeout.  This is the fallback cleanup path that fires even if
+  // deactivate() itself throws or is bypassed -- complementing the
+  // `return lspDeactivate()` in extension.ts, which is the "wait for
+  // graceful stop" path.
+  context.subscriptions.push(client);
 
-  // Start the client. This will also launch the server
+  // Start the client. This will also launch the server.
   client.start();
   console.log("PreTeXt LSP Launched");
   pretextOutputChannel.appendLine("PreTeXt LSP Launched");

@@ -1,5 +1,4 @@
-import { window } from "vscode";
-import { lspFormatDocument } from "../lsp-client/main";
+import { window, commands } from "vscode";
 
 /**
  * Find the most recent unclosed XML tag before the cursor position.
@@ -77,6 +76,9 @@ export async function cmdCloseTag() {
   });
 
   // Format the document to fix indentation of the content
-  // between the opening and closing tags.
-  lspFormatDocument(editor);
+  // between the opening and closing tags.  Uses VS Code's
+  // built-in format command, which routes through the LSP's
+  // textDocument/formatting capability (declared as
+  // documentFormattingProvider: true in the server).
+  await commands.executeCommand("editor.action.formatDocument");
 }

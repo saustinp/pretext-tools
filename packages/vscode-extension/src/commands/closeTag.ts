@@ -1,12 +1,23 @@
-import { window, commands } from "vscode";
+import { window, Position, Range } from "vscode";
 
 /**
- * Find the most recent unclosed XML tag before the cursor position.
+ * Result of finding the most recent unclosed tag: its name and
+ * the indentation of the line where the opening tag appears.
+ */
+interface UnclosedTag {
+  name: string;
+  indent: string;
+}
+
+/**
+ * Find the most recent unclosed XML tag before the cursor position,
+ * along with the indentation of the line containing the opening tag.
  *
- * Uses a stack-based scan: opening tags are pushed, closing tags pop
- * the matching opener.  After processing all tags before the cursor,
- * the top of the stack is the nearest unclosed tag.  Self-closing
- * tags (e.g. `<idx/>`) are excluded by the regex.
+ * Uses a stack-based scan: opening tags are pushed (with their
+ * offset in the text), closing tags pop the matching opener.
+ * After processing all tags before the cursor, the top of the stack
+ * is the nearest unclosed tag.  Self-closing tags (e.g. `<idx/>`)
+ * are excluded by the regex.
  *
  * Adapted from `getCurrentTag()` in @pretextbook/completions
  * (packages/completions/src/utils.ts).
@@ -14,22 +25,28 @@ import { window, commands } from "vscode";
 function findUnclosedTag(
   text: string,
   position: { line: number; character: number },
-): string | undefined {
+): UnclosedTag | undefined {
   const lines = text.split(/\r?\n/);
   const beforeCursor =
     lines.slice(0, position.line).join("\n") +
     (position.line > 0 ? "\n" : "") +
     (lines[position.line] || "").slice(0, position.character);
 
-  const allTags = (beforeCursor.match(/<(\w)+(?![^>]*\/>)|<\/\w+/g) || []).map(
-    (tag) => tag.slice(1),
-  );
+  // Match opening tags (excluding self-closing) and closing tags,
+  // capturing the offset so we can look up indentation later.
+  const tagPattern = /<(\w)+(?![^>]*\/>)|<\/\w+/g;
+  const matches: { name: string; offset: number }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = tagPattern.exec(beforeCursor)) !== null) {
+    matches.push({ name: m[0].slice(1), offset: m.index });
+  }
 
-  const openTagStack: string[] = [];
-  for (const tag of allTags) {
-    if (tag.startsWith("/")) {
+  // Walk the matches with a stack, tracking the offset of each opener.
+  const openTagStack: { name: string; offset: number }[] = [];
+  for (const tag of matches) {
+    if (tag.name.startsWith("/")) {
       const lastOpenTag = openTagStack.pop();
-      if (lastOpenTag !== tag.slice(1)) {
+      if (lastOpenTag && lastOpenTag.name !== tag.name.slice(1)) {
         continue;
       }
     } else {
@@ -37,7 +54,23 @@ function findUnclosedTag(
     }
   }
 
-  return openTagStack.pop();
+  const unclosed = openTagStack.pop();
+  if (!unclosed) {
+    return undefined;
+  }
+
+  // Find the indentation of the line containing the opening tag.
+  // Count backwards from the offset to find the start of the line,
+  // then extract leading whitespace.
+  let lineStart = unclosed.offset;
+  while (lineStart > 0 && beforeCursor[lineStart - 1] !== "\n") {
+    lineStart--;
+  }
+  const lineText = beforeCursor.slice(lineStart);
+  const indentMatch = lineText.match(/^(\s*)/);
+  const indent = indentMatch ? indentMatch[1] : "";
+
+  return { name: unclosed.name, indent };
 }
 
 /**
@@ -48,8 +81,7 @@ function findUnclosedTag(
  * Emacs C-c prefix key).
  *
  * 1. Scans backward from cursor to find the nearest unclosed opening tag
- * 2. Inserts `</tagname>` at the cursor position
- * 3. Runs the PreTeXt formatter to fix indentation
+ * 2. Inserts `</tagname>` on a new line at the opening tag's indentation
  */
 export async function cmdCloseTag() {
   const editor = window.activeTextEditor;
@@ -60,25 +92,36 @@ export async function cmdCloseTag() {
   const document = editor.document;
   const position = editor.selection.active;
 
-  const tag = findUnclosedTag(document.getText(), {
+  const unclosed = findUnclosedTag(document.getText(), {
     line: position.line,
     character: position.character,
   });
 
-  if (!tag) {
+  if (!unclosed) {
     window.showInformationMessage("No unclosed tag found.");
     return;
   }
 
-  const closingTag = `</${tag}>`;
-  await editor.edit((editBuilder) => {
-    editBuilder.insert(position, closingTag);
-  });
+  // Build the closing tag text.  If the cursor is already at the
+  // start of an empty (whitespace-only) line, replace that line's
+  // whitespace and insert the closing tag at the opening tag's
+  // indentation level.  Otherwise insert a newline first.
+  const currentLine = document.lineAt(position.line);
+  const lineIsEmpty = currentLine.text.trim() === "";
 
-  // Format the document to fix indentation of the content
-  // between the opening and closing tags.  Uses VS Code's
-  // built-in format command, which routes through the LSP's
-  // textDocument/formatting capability (declared as
-  // documentFormattingProvider: true in the server).
-  await commands.executeCommand("editor.action.formatDocument");
+  await editor.edit((editBuilder) => {
+    if (lineIsEmpty) {
+      // Replace the entire current line content (just whitespace)
+      // with the properly-indented closing tag.
+      const lineRange = new Range(
+        new Position(position.line, 0),
+        new Position(position.line, currentLine.text.length),
+      );
+      editBuilder.replace(lineRange, `${unclosed.indent}</${unclosed.name}>`);
+    } else {
+      // Cursor is on a line with content — insert a newline
+      // followed by the indented closing tag.
+      editBuilder.insert(position, `\n${unclosed.indent}</${unclosed.name}>`);
+    }
+  });
 }

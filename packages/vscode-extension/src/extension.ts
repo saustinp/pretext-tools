@@ -32,6 +32,7 @@ import {
   cmdGenerate,
 } from "./commands/build";
 import { cmdSelectCommand } from "./commands/select";
+import { cmdCloseTag } from "./commands/closeTag";
 // Set up types:
 import {
   activate as lspActivate,
@@ -158,6 +159,7 @@ export async function activate(context: ExtensionContext) {
         "oscarlevin.pretext-tools#gettingStarted",
       );
     }),
+    commands.registerCommand("pretext-tools.closeTag", cmdCloseTag),
   );
 
   // Register the document outline tree view

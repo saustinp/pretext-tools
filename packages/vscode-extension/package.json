@@ -121,6 +121,12 @@
         "key": "ctrl+alt+j",
         "mac": "cmd+alt+j",
         "when": "editorTextFocus && editorLangId == 'pretext'"
+      },
+      {
+        "command": "pretext-tools.closeTag",
+        "key": "ctrl+c /",
+        "mac": "ctrl+c /",
+        "when": "editorTextFocus && editorLangId == 'pretext'"
       }
     ],
     "commands": [
@@ -275,6 +281,11 @@
       {
         "command": "pretext-tools.gettingStarted",
         "title": "Open getting started walkthrough",
+        "category": "PreTeXt"
+      },
+      {
+        "command": "pretext-tools.closeTag",
+        "title": "Close Most Recent Tag",
         "category": "PreTeXt"
       }
     ],
